@@ -1,0 +1,30 @@
+{
+  "name": "backbone.node",
+  "version": "0.1.0",
+  "homepage": "https://github.com/ersmo/backbone.node",
+  "authors": [
+    "fanlia <fanlia@outlook.com>"
+  ],
+  "description": "when backbone app becomes too big, break it to nodes, as if each node was a small backbone app.",
+  "main": "backbone.node.coffee",
+  "moduleType": [
+    "globals"
+  ],
+  "keywords": [
+    "backbone",
+    "pub"
+  ],
+  "license": "MIT",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "backbone": "*",
+    "jquery": "*"
+  }
+}
