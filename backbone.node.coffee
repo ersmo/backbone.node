@@ -11,6 +11,8 @@ do ($, Backbone, _) ->
   class Backbone.Node extends Event
 
     constructor: ->
+      @ancestor = null
+      @cluster = {}
       @nodes = {}
       @initialize.apply this, arguments
 
@@ -22,8 +24,24 @@ do ($, Backbone, _) ->
     tearDown: (name, node) ->
       # console.log 'tearDown ', name, node
 
+    _setCluster: (ancestor) ->
+      @ancestor = ancestor
+      @ancestor.cluster[@_node_name] = this
+      node._setCluster ancestor for name, node of @nodes
+
+    _delCluster: ->
+      node._delCluster() for name, node of @nodes
+      delete @cluster[name] for name, node of @cluster
+      delete @ancestor.cluster[@_node_name]
+      @ancestor = null
+
+    parent: ->
+      @_events?.bubble?[0].context
+
     _setUp: (name, node) ->
       # globalNodes[name] = node
+      node._node_name = name
+      node._setCluster this
       @nodes[name] = node
       @setUp name, node
       @listenTo node, 'bubble', @pub
@@ -35,6 +53,7 @@ do ($, Backbone, _) ->
       node._tearDown childName, childNode for childName, childNode of node.nodes
       @tearDown name, node
       delete @nodes[name]
+      node._delCluster()
       # delete globalNodes[name]
 
     set: (name, node) ->
@@ -68,4 +87,4 @@ do ($, Backbone, _) ->
       @trigger args...
       node._notify args... for name, node of @nodes
 
-  Event.extend = Backbone.Node.extend = Backbone.Model.extend      
+  Event.extend = Backbone.Node.extend = Backbone.Model.extend
