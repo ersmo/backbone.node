@@ -158,4 +158,4 @@ do ($, Backbone, _) ->
 
         else false
 
-  Event.extend = Backbone.Machine.extend = Backbone.Node.extend = Backbone.Model.extend
+  Event.extend = Backbone.Domain.extend = Backbone.Node.extend = Backbone.Model.extend
