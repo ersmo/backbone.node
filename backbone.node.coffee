@@ -94,7 +94,7 @@ do ($, Backbone, _) ->
       node._notify args... for name, node of @nodes
 
 
-  class Backbone.Machine extends Event
+  class Backbone.Domain extends Event
 
     constructor: (@map = {}, autoStart = true) ->
       @initialize.apply this, arguments
