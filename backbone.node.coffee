@@ -18,6 +18,12 @@ do ($, Backbone, _) ->
 
     initialize: ->
 
+    domainProxy: (eventName) ->
+      => @domainPub eventName, arguments...
+
+    domainPub: ->
+      (@ancestor or this).$?.trigger arguments...
+
     setUp: (name, node) ->
       # console.log 'setUp ', name, node
 
@@ -87,4 +93,69 @@ do ($, Backbone, _) ->
       @trigger args...
       node._notify args... for name, node of @nodes
 
-  Event.extend = Backbone.Node.extend = Backbone.Model.extend
+
+  class Backbone.Machine extends Event
+
+    constructor: (@map = {}, autoStart = true) ->
+      @initialize.apply this, arguments
+      @startApp() if @map.application and autoStart
+
+    initialize: ->
+
+    getNode: (name) ->
+      if name is 'application' then @application else @application.cluster[name]
+
+    setNode: (parent, name, params = {}) ->
+      block = @_defaultMapper name
+      return unless block and block.require.call this
+      node = new block.node _.extend params, block.params
+      node._block_name = name
+      @setNode node, child, params for child in block.children
+      parent.set block.target, node
+
+      this
+
+    switchNode: (name, params = {}) ->
+      return @startApp() if name is 'application'
+      block = @_defaultMapper name
+      return unless block and block.require.call this
+      parent = @getNode block.target
+      grand = parent.parent()
+
+      @setNode grand, name, params
+      @trigger name + ':started'
+
+      this
+
+    startApp: ->
+      block = @_defaultMapper 'application'
+      return unless block
+
+      @application = new block.node block.params
+      @application.$ = this
+      @setNode @application, child, block.params for child in block.children
+      @trigger 'application:started'
+
+      this
+
+    _defaultMapper: (name) ->
+      block = @map[name]
+      switch typeof block
+        when 'function'
+          target: name
+          node: block
+          children: []
+          params: {}
+          require: -> true
+
+        when 'object'
+          block.target ?= name
+          block.children ?= []
+          block.children = [block.children] if typeof block.children is 'string'
+          block.params ?= {}
+          block.require ?= -> true
+          block
+
+        else false
+
+  Event.extend = Backbone.Machine.extend = Backbone.Node.extend = Backbone.Model.extend
