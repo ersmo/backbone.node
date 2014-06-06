@@ -123,6 +123,7 @@ do ($, Backbone, _) ->
       grand = parent.parent()
 
       @setNode grand, name, params
+      grand._notify 'ready', name, params
       @trigger name + ':started'
 
       this
