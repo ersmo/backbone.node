@@ -2,6 +2,105 @@ do ($, Backbone, _) ->
 
   Backbone.$ = $ unless _.isFunction Backbone.$
 
+  class Resource extends Backbone.Model
+    defaults:
+      name: ''
+      target: ''
+      node: ''
+      type: ''
+
+  class Resources extends Backbone.Collection
+
+    model: Resource
+
+    initialize: ->
+      @on 'add', @whenAdd
+      @resources = {}
+
+    whenAdd: (model) ->
+      {name, type} = model.toJSON()
+      event = name + ':' + type
+      @trigger event, model
+
+    getResource: (name, target, node, type) ->
+      {name, target, node, type}
+
+    findDefine: (name, target, node) ->
+      @findWhere @getResource name, target, node._node_name,  'define'
+
+    findRequire: (name, target, node) ->
+      @findWhere @getResource name, target, node._node_name,  'require'
+
+    addResources: (node) ->
+      @addNode node
+      @addNode child for childName, child of node.nodes
+
+    removeResources: (node) ->
+      @removeNode child for childName, child of node.nodes      
+      @removeNode node
+
+    addNode: (node) ->
+      @addDefines node, _.result(node, 'defines')
+      @addRequires node, _.result(node, 'requires')
+
+    addDefines: (node, defines) ->
+      return unless _.isObject defines
+      @addDefine name, target, node for name, target of defines
+
+    addRequires: (node, requires) ->
+      return unless _.isObject requires
+      @addRequire name, target, node for name, target of requires
+
+    addDefine: (name, target, node) ->
+      define = @findWhere name: name, type: 'define'
+      @remove define if define
+      # console.log 'define:', name, 'from', node._node_name
+      @resources[name] = node[target]
+      @updateDefine name, target, node 
+      @add  @getResource name, target, node._node_name,  'define'
+
+    addRequire: (name, target, node) ->
+      return @laterRequire name, target, node unless @resources[name]
+      # console.log 'require', name, 'from', node._node_name
+      node[target] = @resources[name]
+      node.trigger target + ':required'
+      @add @getResource name, target, node._node_name,  'require'
+
+    laterRequire: (name, target, node) ->
+      @once name + ':define', => @addRequire name, target, node
+
+    updateDefine: (name, target, node) ->
+      @resources[name] = node[target]
+      users = @where name:name, type: 'require'
+      @_updateDefine user, name  for user in users
+
+    _updateDefine: (user, name) ->
+      @trigger 'node:execute', user.get('node'), (node) => node and node[user.get 'target'] = @resources[name]
+      
+    removeNode: (node) ->
+      @removeDefines node, _.result(node, 'defines')
+      @removeRequires node, _.result(node, 'requires')
+
+    removeDefines: (node, defines) ->
+      return unless _.isObject defines
+      @removeDefine name, target, node for name, target of defines
+
+    removeRequires: (node, requires) ->
+      return unless _.isObject requires
+      @removeRequire name, target, node for name, target of requires
+
+    removeDefine: (name, target, node) ->
+      # console.log 'remove:define:', name, 'from', node._node_name
+      node[target] = null
+      @updateDefine name, target, node
+      @remove @findDefine name, target, node
+
+    removeRequire: (name, target, node) ->
+      # console.log 'remove:require:', name, 'from', node._node_name
+      node[target] = null
+      node.trigger target + ':removed'
+      @remove @findRequire name, target, node
+
   class Event
 
     _.extend Event::, Backbone.Events
@@ -16,6 +115,11 @@ do ($, Backbone, _) ->
       @nodes = {}
       @initialize.apply this, arguments
 
+
+    defines: {}
+
+    requires: {}
+
     initialize: ->
 
     domainProxy: (eventName) ->
@@ -23,6 +127,33 @@ do ($, Backbone, _) ->
 
     domainPub: ->
       (@ancestor or this).$?.trigger arguments...
+
+    listenWhen: (events, callback, context = this) ->
+      i = 0
+      events = events.split /\s+/
+      temp = -> 
+        i++
+        callback.call context if i is events.length
+
+      for _event in events
+        [target, event_name] = _event.split /:(.+)?/
+        throw new Error 'target and name required' unless context[target] and event_name
+        @listenTo context[target], event_name, temp
+
+      this
+
+    listenWhenOnce: (events, callback, context = this) ->
+      i = 0
+      events = events.split /\s+/
+      temp = -> 
+        i++
+        callback.call context if i is events.length
+
+      for _event in events
+        [target, event_name] = _event.split '.'
+        @listenToOnce context[target], event_name, temp
+
+      this
 
     setUp: (name, node) ->
       # console.log 'setUp ', name, node
@@ -60,6 +191,7 @@ do ($, Backbone, _) ->
       @tearDown name, node
       delete @nodes[name]
       node._delCluster()
+      # console.log '_tearDown', node
       # delete globalNodes[name]
 
     set: (name, node) ->
@@ -93,14 +225,32 @@ do ($, Backbone, _) ->
       @trigger args...
       node._notify args... for name, node of @nodes
 
+    _execute: (func, args...) ->
+      @[func]? args...
+      node._execute func, args... for name, node of @nodes
+
+    _ready: ->
+      @_checkRequiresMeeted()  
+      @ready arguments...
+
+    _checkRequiresMeeted: ->
+      for name, target of _.result this, 'requires'
+        throw new Error name + ' failed to require as ' + target unless this[target] 
+
+    ready: ->
 
   class Backbone.Domain extends Event
 
     constructor: (@map = {}, autoStart = true) ->
+      @resources = new Resources
+      @listenTo @resources, 'node:execute', @executeNode
       @initialize.apply this, arguments
       @startApp() if @map.application and autoStart
 
     initialize: ->
+
+    executeNode: (name, callback) ->
+      callback @getNode name
 
     getNode: (name) ->
       if name is 'application' then @application else @application.cluster[name]
@@ -120,10 +270,16 @@ do ($, Backbone, _) ->
       block = @_defaultMapper name
       return unless block and block.require.call this
       parent = @getNode block.target
+      # console.log parent
       grand = parent.parent()
-
+      @resources.removeResources parent
       @setNode grand, name, params
-      grand._notify 'ready', name, params
+
+      current = @getNode block.target
+      # console.log current
+      # console.log @application
+      @resources.addResources current
+      grand._execute '_ready', name, params
       @trigger name + ':started'
 
       this
@@ -131,10 +287,12 @@ do ($, Backbone, _) ->
     startApp: ->
       block = @_defaultMapper 'application'
       return unless block
-
+      @resources.removeResources @application if @application
       @application = new block.node block.params
+      @application._node_name = 'application'
       @application.$ = this
       @setNode @application, child, block.params for child in block.children
+      @resources.addResources @application
       @trigger 'application:started'
 
       this
