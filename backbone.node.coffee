@@ -36,7 +36,7 @@ do ($, Backbone, _) ->
       @addNode child for childName, child of node.nodes
 
     removeResources: (node) ->
-      @removeNode child for childName, child of node.nodes      
+      @removeNode child for childName, child of node.nodes
       @removeNode node
 
     addNode: (node) ->
@@ -56,7 +56,7 @@ do ($, Backbone, _) ->
       @remove define if define
       # console.log 'define:', name, 'from', node._node_name
       @resources[name] = node[target]
-      @updateDefine name, target, node 
+      @updateDefine name, target, node
       @add  @getResource name, target, node._node_name,  'define'
 
     addRequire: (name, target, node) ->
@@ -75,8 +75,13 @@ do ($, Backbone, _) ->
       @_updateDefine user, name  for user in users
 
     _updateDefine: (user, name) ->
-      @trigger 'node:execute', user.get('node'), (node) => node and node[user.get 'target'] = @resources[name]
-      
+      @trigger 'node:execute', user.get('node'), (node) =>
+        return unless node
+        last = node[user.get 'target']
+        current = @resources[name]
+        @moveListening node, last, current
+        node[user.get 'target'] = @resources[name]
+
     removeNode: (node) ->
       @removeDefines node, _.result(node, 'defines')
       @removeRequires node, _.result(node, 'requires')
@@ -105,6 +110,16 @@ do ($, Backbone, _) ->
 
     _.extend Event::, Backbone.Events
 
+    moveListening: (listener, last, current) ->
+      return unless _.isObject last._events
+      for name, events of last._events
+        for _event in events when _event.ctx is listener
+          listener.listenTo current, name, _event.callback
+
+      listener.stopListening last
+
+      this
+
   # globalNodes = {}
 
   class Backbone.Node extends Event
@@ -131,7 +146,7 @@ do ($, Backbone, _) ->
     listenWhen: (events, callback, context = this) ->
       i = 0
       events = events.split /\s+/
-      temp = -> 
+      temp = ->
         i++
         callback.call context if i is events.length
 
@@ -145,7 +160,7 @@ do ($, Backbone, _) ->
     listenWhenOnce: (events, callback, context = this) ->
       i = 0
       events = events.split /\s+/
-      temp = -> 
+      temp = ->
         i++
         callback.call context if i is events.length
 
@@ -230,12 +245,12 @@ do ($, Backbone, _) ->
       node._execute func, args... for name, node of @nodes
 
     _ready: ->
-      @_checkRequiresMeeted()  
+      @_checkRequiresMeeted()
       @ready arguments...
 
     _checkRequiresMeeted: ->
       for name, target of _.result this, 'requires'
-        throw new Error name + ' failed to require as ' + target unless this[target] 
+        throw new Error name + ' failed to require as ' + target unless this[target]
 
     ready: ->
 
