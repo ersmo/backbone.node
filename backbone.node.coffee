@@ -165,8 +165,9 @@ do ($, Backbone, _) ->
         callback.call context if i is events.length
 
       for _event in events
-        [target, event_name] = _event.split '.'
-        @listenToOnce context[target], event_name, temp
+        [target, event_name] = _event.split /:(.+)?/
+        throw new Error 'target and name required' unless context[target] and event_name
+        @listenTo context[target], event_name, temp
 
       this
 
