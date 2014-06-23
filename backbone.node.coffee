@@ -79,7 +79,7 @@ do ($, Backbone, _) ->
         return unless node
         last = node[user.get 'target']
         current = @resources[name]
-        @moveListening node, last, current
+        node.moveListening node, last, current
         node[user.get 'target'] = @resources[name]
 
     removeNode: (node) ->
