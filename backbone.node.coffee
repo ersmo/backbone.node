@@ -308,6 +308,7 @@ do ($, Backbone, _) ->
       @application.$ = this
       @setNode @application, child, block.params for child in block.children
       @resources.addResources @application
+      @application._execute '_ready'
       @trigger 'application:started'
 
       this
