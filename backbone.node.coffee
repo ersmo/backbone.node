@@ -286,6 +286,7 @@ do ($, Backbone, _) ->
       block = @_defaultMapper name
       return unless block and block.require.call this
       parent = @getNode block.target
+      return if parent._block_name is name
       # console.log parent
       grand = parent.parent()
       @resources.removeResources parent
