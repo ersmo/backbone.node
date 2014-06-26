@@ -112,9 +112,10 @@ do ($, Backbone, _) ->
 
     moveListening: (listener, last, current) ->
       return unless _.isObject last._events
-      for name, events of last._events
-        for _event in events when _event.ctx is listener
-          listener.listenTo current, name, _event.callback
+      if current
+        for name, events of last._events
+          for _event in events when _event.ctx is listener
+            listener.listenTo current, name, _event.callback
 
       listener.stopListening last
 
