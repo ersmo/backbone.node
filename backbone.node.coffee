@@ -172,6 +172,20 @@ do ($, Backbone, _) ->
 
       this
 
+    series: (collection, event, getNext, delay = 10) ->
+      i = 0
+      getNext ?= (i) -> collection.at i
+      first = getNext i
+      return unless first
+
+      fn = ->
+        i++
+        return collection.trigger 'series:done' if i is collection.length
+        model = getNext i
+        setTimeout (-> model.trigger event, fn), delay
+
+      first.trigger event, fn
+
     setUp: (name, node) ->
       # console.log 'setUp ', name, node
 
