@@ -276,15 +276,26 @@ do ($, Backbone, _) ->
       @resources = new Resources
       @listenTo @resources, 'node:execute', @executeNode
       @initialize.apply this, arguments
+      @define _.result this, 'defines'
       @startApp() if @map.application and autoStart
 
+    defines: {}
+
+    _node_name: 'root'
+
     initialize: ->
+
+    define: (defines) ->
+      @resources.addDefines this, defines
 
     executeNode: (name, callback) ->
       callback @getNode name
 
     getNode: (name) ->
-      if name is 'application' then @application else @application.cluster[name]
+      switch name
+        when 'root' then this
+        when 'application' then @application
+        else @application.cluster[name]
 
     setNode: (parent, name, params = {}) ->
       block = @_defaultMapper name
@@ -311,7 +322,7 @@ do ($, Backbone, _) ->
       # console.log current
       # console.log @application
       @resources.addResources current
-      grand._execute '_ready', name, params
+      current._execute '_ready', name, params
       @trigger name + ':started'
 
       this
