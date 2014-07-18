@@ -257,8 +257,8 @@ do ($, Backbone, _) ->
       node._notify args... for name, node of @nodes
 
     _execute: (func, args...) ->
-      @[func]? args...
       node._execute func, args... for name, node of @nodes
+      @[func]? args...
 
     _ready: ->
       @_checkRequiresMeeted()
@@ -269,6 +269,8 @@ do ($, Backbone, _) ->
         throw new Error name + ' failed to require as ' + target unless this[target]
 
     ready: ->
+
+    restart: ->
 
   class Backbone.Domain extends Event
 
@@ -312,7 +314,7 @@ do ($, Backbone, _) ->
       block = @_defaultMapper name
       return unless block and block.require.call this
       parent = @getNode block.target
-      return if parent._block_name is name
+      return parent.restart params if parent._block_name is name
       # console.log parent
       grand = parent.parent()
       @resources.removeResources parent
@@ -322,7 +324,7 @@ do ($, Backbone, _) ->
       # console.log current
       # console.log @application
       @resources.addResources current
-      current._execute '_ready', name, params
+      current._execute '_ready', params
       @trigger name + ':started'
 
       this
