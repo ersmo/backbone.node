@@ -16,6 +16,35 @@ do ($, Backbone, _) ->
     initialize: ->
       @on 'add', @whenAdd
       @resources = {}
+      @states = {}
+
+    watch: (_event, record = false) ->
+      [name, eventName] = _event.split /:(.+)?/
+      throw new Error 'name and event required' unless @resources[name] and eventName
+      resource = @resources[name]
+      return unless resource or @states[_event]
+      @listenTo resource, eventName, (data) => @states[_event] = if record then data else true
+
+    when: (events..., callback, context) ->
+      { resources, states } = this
+      callback = _.bind callback, context
+      promises = _.map events, (_event) ->
+        [name, eventName] = _event.split /:(.+)?/
+        throw new Error 'name and event required' unless resources[name] and eventName
+        deferred = $.Deferred()
+        state = states[_event]
+        resource = resources[name]
+
+        if state
+          deferred.resolve state
+        else
+          resource.once eventName, (data) -> deferred.resolve data
+
+        deferred.promise()
+
+      $
+      .when promises...
+      .done callback
 
     whenAdd: (model) ->
       {name, type} = model.toJSON()
@@ -137,6 +166,12 @@ do ($, Backbone, _) ->
     requires: {}
 
     initialize: ->
+
+    watch: (_event, record = false) ->
+      (@ancestor or this).$?.resources?.watch _event, record
+
+    when: (events..., callback) ->
+      (@ancestor or this).$?.resources?.when events..., callback, this
 
     domainProxy: (eventName) ->
       => @domainPub eventName, arguments...
@@ -276,6 +311,10 @@ do ($, Backbone, _) ->
 
     constructor: (@map = {}, autoStart = true) ->
       @resources = new Resources
+      # @resources.listenTo this, ':watch', -> console.log 'domain:watch'
+      # @resources.listenTo this, ':when', -> console.log 'domain:when'
+      # @resources.listenTo this, ':watch', @resources.watch
+      # @resources.listenTo this, ':when', @resources.when
       @listenTo @resources, 'node:execute', @executeNode
       @initialize.apply this, arguments
       @define _.result this, 'defines'
