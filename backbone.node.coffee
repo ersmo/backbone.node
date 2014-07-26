@@ -18,12 +18,14 @@ do ($, Backbone, _) ->
       @resources = {}
       @states = {}
 
-    watch: (_event, record = false) ->
+    watch: (context, _event, record = false) ->
       [name, eventName] = _event.split /:(.+)?/
       throw new Error 'name and event required' unless @resources[name] and eventName
       resource = @resources[name]
-      return unless resource or @states[_event]
-      @listenTo resource, eventName, (data) => @states[_event] = if record then data else true
+      resourceModel = @findWhere {name, type: 'define'}
+      return unless resource or resourceModel or @states[_event]
+      context.listenToOnce resourceModel, 'remove', => delete @states[_event]
+      context.listenTo resource, eventName, (data) => @states[_event] = if record then data else true
 
     when: (events..., callback, context) ->
       { resources, states } = this
@@ -168,7 +170,7 @@ do ($, Backbone, _) ->
     initialize: ->
 
     watch: (_event, record = false) ->
-      (@ancestor or this).$?.resources?.watch _event, record
+      (@ancestor or this).$?.resources?.watch this, _event, record
 
     when: (events..., callback) ->
       (@ancestor or this).$?.resources?.when events..., callback, this
