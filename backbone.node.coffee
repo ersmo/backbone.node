@@ -37,7 +37,7 @@ do ($, Backbone, _) ->
         state = states[_event]
         resource = resources[name]
 
-        if state
+        if _.has states, _event
           deferred.resolve state
         else
           resource.once eventName, (data) -> deferred.resolve data
