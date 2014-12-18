@@ -341,6 +341,7 @@ do ($, Backbone, _) ->
         else @application.cluster[name]
 
     setNode: (parent, name, params = {}) ->
+      throw new Error "circle node reference: require #{name} from #{parent._block_name}"  if parent._block_name is name
       block = @_defaultMapper name
       return unless block and block.require.call this
       node = new block.node _.extend params, block.params
